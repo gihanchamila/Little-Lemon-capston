@@ -40,7 +40,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'LittleLemonAPI',
     'rest_framework',
-    'rest_framework.authtoken',
     'djoser',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',   
@@ -144,8 +143,8 @@ REST_FRAMEWORK = {
 }
 
 DJOSER = {
-    "USER_ID_FIELD" : "username",
-    "LOGIN_FIELD" : "email",
+    "USER_ID_FIELD": "username",
+    "LOGIN_FIELD": "email",
 }
 
 SIMPLE_JWT = {
