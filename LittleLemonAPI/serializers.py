@@ -1,8 +1,5 @@
 from rest_framework import serializers
 from .models import Category, MenuItem, Order, OrderItem, Cart
-from django.contrib.auth.models import User
-from django.utils import timezone
-from django.core.exceptions import ValidationError
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:

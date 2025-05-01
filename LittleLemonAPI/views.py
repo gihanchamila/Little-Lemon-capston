@@ -1,15 +1,40 @@
-from django.shortcuts import render
-from django.http import HttpResponse
-from rest_framework.response import Response
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
 
+import math
+from rest_framework import generics
+from django.shortcuts import get_object_or_404
+from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden, HttpResponseNotAllowed, HttpResponseNotFound
+from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from django.contrib.auth.models import User, Group
+
+from .models import MenuItem, Cart, Order
+from .serializers import MenuItemSerializer, CartSerializer, OrderSerializer
+from .permissions import IsManager, IsDeliveryCrew
+from .paginations import MenuItemListPagination
 
 # Create your views here.
-def index(request):
-    return HttpResponse("Hello, world. You're at the Little Lemon index.")
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def secret_view(request):
-    return HttpResponse("This is a secret view. Only authenticated users can see this.")
+class MenuItemList(generics.ListCreateAPIView):
+    throttle_classes = [UserRateThrottle, AnonRateThrottle]
+    queryset = MenuItem.objects.all()
+    serializer_class = MenuItemSerializer
+    search_fields = ['title', 'category__title']
+    ordering_fields = ['title', 'price']
+    pagination_class = MenuItemListPagination
+
+    def get_permissions(self):
+        permission_classes = []
+        if self.request.method != 'GET':
+                permission_classes = [IsAuthenticated,IsManager]
+        return[permission() for permission in permission_classes]
+    
+class MenuItemDetail(generics.RetrieveUpdateDestroyAPIView):
+    throttle_classes = [UserRateThrottle, AnonRateThrottle]
+    queryset = MenuItem.objects.all()
+    serializer_class = MenuItemSerializer
+
+    def get_permissions(self):
+        permission_classes = []
+        if self.request.method != 'GET':
+                permission_classes = [IsAuthenticated,IsManager]
+        return[permission() for permission in permission_classes]
