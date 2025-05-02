@@ -12,7 +12,7 @@ from decimal import Decimal
 from .models import MenuItem, Cart, Order, OrderItem
 from .serializers import UserSerializer, MenuItemSerializer, CartSerializer, OrderSerializer, OrderItemSerializer
 from .permissions import IsManager
-from .paginations import MenuItemListPagination, OrderListPagination
+from .paginations import MenuItemListPagination, OrderListPagination, CartListPagination
 
 # Create your views here.
 
@@ -193,7 +193,7 @@ class CartOperationsView(generics.ListCreateAPIView, generics.RetrieveUpdateDest
     permission_classes = [IsAuthenticated]
     search_fields = ['menuitem__title']
     ordering_fields = ['menuitem__title', 'quantity']
-    pagination_class = OrderListPagination
+    pagination_class = CartListPagination
 
     def get_queryset(self):
         return Cart.objects.filter(user=self.request.user)
@@ -279,6 +279,10 @@ class OrderList(generics.ListCreateAPIView):
     """
     throttle_classes = [UserRateThrottle, AnonRateThrottle]
     serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated]
+    search_fields = ['user__username', 'status']
+    ordering_fields = ['user__username', 'status']
+    pagination_class = OrderListPagination
 
     def get_queryset(self, *args, **kwargs):
         if self.request.user.groups.filter(name='Manager').exists() or self.request.user.is_superuser:
@@ -340,6 +344,7 @@ class OrderDetail(generics.RetrieveUpdateDestroyAPIView):
     throttle_classes = [UserRateThrottle, AnonRateThrottle]
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
+    
 
     def get_queryset(self):
         if self.request.user.groups.filter(name='Manager').exists() or self.request.user.is_superuser:
