@@ -29,9 +29,9 @@ class MenuItem(models.Model):
 class Cart(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE) 
     menuitem = models.ForeignKey(MenuItem, on_delete=models.CASCADE)
-    quantity = models.BooleanField(db_index=True)
-    unit_price = models.DecimalField(max_digits=6, decimal_places=2)
-    price = models.DecimalField(max_digits=6, decimal_places=2)
+    quantity = models.IntegerField(db_index=True)
+    unit_price = models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
+    price = models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
 
     class Meta:
         unique_together = ('menuitem', 'user')
@@ -42,18 +42,19 @@ class Cart(models.Model):
     def clean(self):
         if self.quantity < 1:
             raise ValidationError("Quantity must be at least 1.")
-    
+
     def save(self, *args, **kwargs):
-        self.price = self.unit_price * self.quantity 
-        self.full_clean() 
+        self.unit_price = self.menuitem.price
+        self.price = self.unit_price * self.quantity
+        self.full_clean()
         super().save(*args, **kwargs)
         
 class Order(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     delivery_crew = models.ForeignKey(User, on_delete=models.SET_NULL, related_name="delivery_crew", null=True)
     status = models.BooleanField(db_index=True, default=0)
-    total = models.DecimalField(max_digits=6, decimal_places=2)
-    date = models.DateField(db_index=True)
+    total = models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
+    date = models.DateField(db_index=True, auto_now_add=True)
 
     def __str__(self):
         return f"Order #{self.id} by {self.user.username}"

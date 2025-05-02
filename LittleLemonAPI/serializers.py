@@ -1,5 +1,21 @@
 from rest_framework import serializers
 from .models import Category, MenuItem, Order, OrderItem, Cart
+from django.contrib.auth.models import User
+
+"""
+    Serializers are used to convert complex data types, like querysets and model instances, into native Python datatypes.
+    They also handle deserialization, allowing parsed data to be converted back into complex types.
+    Serializers are similar to Django Forms, but they are not tied to any specific view or template.
+
+    Serializers can be used to validate data, and they can also be used to create or update model instances.
+    Serializers can be used to create custom fields, and they can also be used to create custom validation methods.
+    
+"""
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email']
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -19,12 +35,15 @@ class MenuItemSerializer(serializers.ModelSerializer):
 class CartSerializer(serializers.ModelSerializer):
     menuitem = MenuItemSerializer(read_only=True)
     menuitem_id = serializers.PrimaryKeyRelatedField(
-        queryset=MenuItem.objects.all(), source='menuitem', write_only=True
+        queryset=MenuItem.objects.all(),
+        source='menuitem',
+        write_only=True
     )
-    
+
     class Meta:
         model = Cart
-        fields = ['id', 'user', 'menuitem', 'menuitem_id', 'quantity', 'unit_price', 'price']
+        fields = ['id', 'menuitem', 'menuitem_id', 'quantity', 'unit_price', 'price']
+        read_only_fields = ['unit_price', 'price']  # prevent clients from editing these
 
     def validate_quantity(self, value):
         if value < 1:
@@ -32,10 +51,20 @@ class CartSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
+        request = self.context.get('request')
+        user = request.user
         menuitem = validated_data['menuitem']
-        validated_data['unit_price'] = menuitem.price
-        validated_data['price'] = validated_data['unit_price'] * validated_data['quantity']
-        return super().create(validated_data)
+        quantity = validated_data['quantity']
+
+        # Prevent duplicates
+        if Cart.objects.filter(user=user, menuitem=menuitem).exists():
+            raise serializers.ValidationError("Item already in cart.")
+
+        return Cart.objects.create(
+            user=user,
+            menuitem=menuitem,
+            quantity=quantity
+        )
     
 class OrderItemSerializer(serializers.ModelSerializer):
     menuitem = serializers.PrimaryKeyRelatedField(queryset=MenuItem.objects.all())
