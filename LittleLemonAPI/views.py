@@ -10,7 +10,7 @@ from django.contrib.auth.models import User, Group
 from decimal import Decimal
 
 from .models import MenuItem, Cart, Order, OrderItem, Category
-from .serializers import CategorySerializer, MenuItemSerializer, CartSerializer, OrderSerializer, OrderItemSerializer, UserSerializer
+from .serializers import CategorySerializer, MenuItemSerializer, CartSerializer, OrderSerializer, UserSerializer, OrderUpdateSerializer
 from .permissions import IsManager
 from .paginations import CategoryListPagination, MenuItemListPagination, OrderListPagination, CartListPagination
 
@@ -332,25 +332,25 @@ class OrderList(generics.ListCreateAPIView):
         total = Decimal('0.00')
 
         for item in cart_items:
+            item_total = item.menuitem.price * item.quantity
             order_items.append(OrderItem(
                 order=order,
                 menuitem=item.menuitem,
                 quantity=item.quantity,
-                unit_price=item.unit_price,
-                price=item.price
+                price=item_total
             ))
-            total += item.price
+            total += item_total
 
         OrderItem.objects.bulk_create(order_items)
 
         order.total = total
         order.save()
 
-        cart_items.delete() #
+        cart_items.delete()
 
         return Response({'message': 'Order created successfully', 'order_id': order.id}, status=201)
     
-class OrderDetail(generics.RetrieveUpdateDestroyAPIView):
+class SingleOrder(generics.RetrieveUpdateDestroyAPIView):
     """
     Retrieve, update or delete an order.
     Only authenticated users can retrieve their own orders.
@@ -364,7 +364,6 @@ class OrderDetail(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
     
-
     def get_queryset(self):
         if self.request.user.groups.filter(name='Manager').exists() or self.request.user.is_superuser:
             return Order.objects.all()
@@ -372,19 +371,21 @@ class OrderDetail(generics.RetrieveUpdateDestroyAPIView):
             return Order.objects.filter(user=self.request.user)
 
     def get_permissions(self):
-        if self.request.method == 'GET':
+        if self.request.method == 'POST' or self.request.method == 'GET':
             permission_classes = [IsAuthenticated]
+        else:
+            permission_classes = [IsAuthenticated, IsManager | IsAdminUser]
 
         return [permission() for permission in permission_classes]
     
     def put(self, request, *args, **kwargs):
         order = self.get_object()
+        serializer = OrderUpdateSerializer(order, data=request.data, partial=True)
         is_manager = request.user.groups.filter(name='Manager').exists()
 
-        if order.user != request.user and not is_manager:
+        if not is_manager:
             return Response({'error': 'You do not have permission to update this order'}, status=403)
         
-
         serializer = self.get_serializer(order, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()

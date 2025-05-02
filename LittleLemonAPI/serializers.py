@@ -70,6 +70,15 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = ['id', 'user', 'delivery_crew',
                   'status', 'date', 'total', 'orderitem']
 
+class OrderUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = ['delivery_crew', 'status']
+
+        def validate_delivery_crew(self, value):
+            if not value.groups.filter(name='delivery crew').exists():
+                raise serializers.ValidationError("Assigned user must be in the delivery crew group.")
+            return value
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:

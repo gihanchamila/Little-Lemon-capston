@@ -13,4 +13,6 @@ urlpatterns = [
     path('delivery/<int:pk>/', views.DeliveryCrewRemove.as_view(), name='single_delivery_crew'),
     path('cart/', views.CartList.as_view(), name='cart'),
     path('cart/<int:pk>/', views.SingleCartItem.as_view(), name='single_cart_item'),
+    path('orders/', views.OrderList.as_view(), name='orders'),
+    path('orders/<int:pk>/', views.SingleOrder.as_view(), name='single_order'),
 ]
