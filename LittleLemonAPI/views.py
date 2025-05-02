@@ -142,7 +142,7 @@ class DeliveryCrewRemove(generics.DestroyAPIView):
         user.groups.remove(group)
         return JsonResponse({'message': 'User removed from Delivery crew group'}, status=200)
     
-class CartOperationsView(generics.ListCreateAPIView):
+class CartOperationsView(generics.ListCreateAPIView, generics.RetrieveUpdateDestroyAPIView):
     throttle_classes = [AnonRateThrottle, UserRateThrottle]
     serializer_class = CartSerializer
     permission_classes = [IsAuthenticated]
@@ -152,6 +152,55 @@ class CartOperationsView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    def post(self, request, *args, **kwargs):
+        menuitem_id = request.data.get('menuitem_id')
+        quantity = request.data.get('quantity')
+
+        if not menuitem_id or not quantity:
+            return JsonResponse({'error': 'Menu item ID and quantity are required'}, status=400)
+
+        try:
+            menuitem = MenuItem.objects.get(id=menuitem_id)
+        except MenuItem.DoesNotExist:
+            return JsonResponse({'error': 'Menu item does not exist'}, status=404)
+
+        cart_item, created = Cart.objects.get_or_create(
+            user=request.user,
+            menuitem=menuitem,
+            defaults={'quantity': quantity, 'unit_price': menuitem.price}
+        )
+
+        if not created:
+            cart_item.quantity += quantity
+            cart_item.save()
+
+        return Response({'message': f"Cart updated successfully, {cart_item.quantity}"}, status=201)
+
+
+    def put(self, request, *args, **kwargs):
+        menuitem_id = request.data.get('menuitem_id')
+        quantity = request.data.get('quantity')
+
+        if not menuitem_id or not quantity:
+            return JsonResponse({'error': 'Menu item ID and quantity are required'}, status=400)
+
+        try:
+            menuitem = MenuItem.objects.get(id=menuitem_id)
+        except MenuItem.DoesNotExist:
+            return JsonResponse({'error': 'Menu item does not exist'}, status=404)
+
+        cart_item, created = Cart.objects.get_or_create(
+            user=request.user,
+            menuitem=menuitem,
+            defaults={'quantity': quantity, 'unit_price': menuitem.price}
+        )
+
+        if not created:
+            cart_item.quantity = quantity
+            cart_item.save()
+
+        return Response({'message': f"Cart updated successfully, {quantity}"}, status=200)
 
     def delete(self, request, *args, **kwargs):
         menuitem_id = request.data.get('menuitem_id')
