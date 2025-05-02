@@ -3,13 +3,15 @@ from . import views
 
 
 urlpatterns = [
-    path('menu-items', views.MenuItemsList.as_view(), name='menu-list'),
-    path('menu-items/<int:pk>', views.MenuItemDetail.as_view(), name='menu-detail'),
-    path('groups/manager/users', views.ManagerList.as_view(), name='manager-list'),
-    path('groups/manager/users/<int:pk>', views.ManagerRemove.as_view(), name='manager-remove'),
-    path('groups/delivery-crew/users', views.DeliveryCrewList.as_view(), name='delivery-crew-list'),
-    path('groups/delivery-crew/<int:pk>', views.DeliveryCrewRemove.as_view(), name='delivery-crew-remove'),
-    path('cart/menu-items', views.CartOperationsView.as_view(), name='cart-menu-list'),
-    path('orders', views.OrderList.as_view(), name='order-list'),
-    path('orders/<int:pk>', views.OrderDetail.as_view(), name='order-detail'),
+    path('categories', views.CategoriesView.as_view()),
+    path('menu-items', views.MenuItemsView.as_view()),
+    path('menu-items/<int:pk>', views.SingleMenuItemView.as_view()),
+    path('cart/menu-items', views.CartView.as_view()),
+    path('orders', views.OrderView.as_view()),
+    path('orders/<int:pk>', views.SingleOrderView.as_view()),
+    path('groups/manager/users', views.GroupViewSet.as_view(
+        {'get': 'list', 'post': 'create', 'delete': 'destroy'})),
+
+    path('groups/delivery-crew/users', views.DeliveryCrewViewSet.as_view(
+        {'get': 'list', 'post': 'create', 'delete': 'destroy'}))
 ]
