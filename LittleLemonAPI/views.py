@@ -3,8 +3,7 @@ import math
 from rest_framework import generics
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from rest_framework.exceptions import PermissionDenied
-from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden, HttpResponseNotAllowed, HttpResponseNotFound
+from django.http import JsonResponse
 from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django.contrib.auth.models import User, Group
@@ -12,12 +11,23 @@ from decimal import Decimal
 
 from .models import MenuItem, Cart, Order, OrderItem
 from .serializers import UserSerializer, MenuItemSerializer, CartSerializer, OrderSerializer, OrderItemSerializer
-from .permissions import IsManager, IsDeliveryCrew
-from .paginations import MenuItemListPagination
+from .permissions import IsManager
+from .paginations import MenuItemListPagination, OrderListPagination
 
 # Create your views here.
 
 class MenuItemsList(generics.ListCreateAPIView):
+
+    """
+    List all menu items or create a new one.
+    Only managers can create new menu items
+    and only authenticated users can view the list.
+    The list is paginated and can be filtered by title and category.
+    The results can be ordered by title and price.
+    The API is rate-limited to 10 requests per minute for authenticated users
+    and 5 requests per minute for anonymous users.
+
+    """
     throttle_classes = [UserRateThrottle, AnonRateThrottle]
     queryset = MenuItem.objects.all()
     serializer_class = MenuItemSerializer
@@ -32,6 +42,14 @@ class MenuItemsList(generics.ListCreateAPIView):
         return[permission() for permission in permission_classes]
     
 class MenuItemDetail(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Retrieve, update or delete a menu item.
+    Only managers can update or delete menu items.
+    The item can be retrieved by its ID.
+    The API is rate-limited to 10 requests per minute for authenticated users
+    and 5 requests per minute for anonymous users.
+
+    """
     throttle_classes = [UserRateThrottle, AnonRateThrottle]
     queryset = MenuItem.objects.all()
     serializer_class = MenuItemSerializer
@@ -43,6 +61,13 @@ class MenuItemDetail(generics.RetrieveUpdateDestroyAPIView):
         return[permission() for permission in permission_classes]
     
 class ManagerList(generics.ListCreateAPIView):
+    """
+    List all users in the Manager group or add a new user to the Manager group.
+    Only authenticated users with the Manager group can access this view.
+    The API is rate-limited to 10 requests per minute for authenticated users
+    and 5 requests per minute for anonymous users.
+
+    """
     throttle_classes = [UserRateThrottle, AnonRateThrottle]
     queryset = User.objects.filter(groups__name='Manager')
     serializer_class = UserSerializer
@@ -67,18 +92,19 @@ class ManagerList(generics.ListCreateAPIView):
         return JsonResponse({'message': 'User added to Manager group'}, status=201)
 
 class ManagerRemove(generics.DestroyAPIView):
-
+    """
+    Remove a user from the Manager group.
+    Only authenticated users with the Manager group can access this view.
+    The API is rate-limited to 10 requests per minute for authenticated users
+    and 5 requests per minute for anonymous users.
+    
+    """
     throttle_classes = [UserRateThrottle, AnonRateThrottle]
     queryset = User.objects.filter(groups__name='Manager')
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated, IsManager]
 
     def delete(self, request, pk, *args, **kwargs):
-        user_id = request.data.get('user_id')
-
-        if not id:
-            return JsonResponse({'error': 'id is required'}, status=400)
-
         try:
             user = User.objects.get(pk=pk)
         except User.DoesNotExist:
@@ -92,10 +118,18 @@ class ManagerRemove(generics.DestroyAPIView):
         return JsonResponse({'message': 'User removed from Manager group'}, status=200)
      
 class DeliveryCrewList(generics.ListCreateAPIView):
+    """
+    List all users in the Delivery Crew group or add a new user to the Delivery Crew group.
+    Only authenticated users with the Manager group can access this view.
+    The API is rate-limited to 10 requests per minute for authenticated users
+    and 5 requests per minute for anonymous users.
+    
+    """
     throttle_classes = [UserRateThrottle, AnonRateThrottle]
     queryset = User.objects.filter(groups__name='Delivery Crew')
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated, IsManager]
+
 
     def post(self, request, *args, **kwargs):
         username = request.data.get('username')
@@ -119,17 +153,19 @@ class DeliveryCrewList(generics.ListCreateAPIView):
         return JsonResponse({'message': 'User added to Delivery Crew group'}, status=201)
     
 class DeliveryCrewRemove(generics.DestroyAPIView):
+    """
+    Remove a user from the Delivery Crew group.
+    Only authenticated users with the Manager group can access this view.
+    The API is rate-limited to 10 requests per minute for authenticated users
+    and 5 requests per minute for anonymous users.
+        
+    """
     throttle_classes = [UserRateThrottle, AnonRateThrottle]
     queryset = User.objects.filter(groups__name='Delivery Crew')
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated, IsManager]
 
     def delete(self, request, pk, *args, **kwargs):
-        user_id = request.data.get('user_id')
-
-        if not id:
-            return JsonResponse({'error': 'id is required'}, status=400)
-
         try:
             user = User.objects.get(pk=pk)
         except User.DoesNotExist:
@@ -143,9 +179,21 @@ class DeliveryCrewRemove(generics.DestroyAPIView):
         return JsonResponse({'message': 'User removed from Delivery crew group'}, status=200)
     
 class CartOperationsView(generics.ListCreateAPIView, generics.RetrieveUpdateDestroyAPIView):
+    """
+    List all items in the cart or add a new item to the cart.
+    Update the quantity of an item in the cart or delete an item from the cart.
+    Only authenticated users can access this view.
+    The API is rate-limited to 10 requests per minute for authenticated users
+    and 5 requests per minute for anonymous users.
+    
+    """
+
     throttle_classes = [AnonRateThrottle, UserRateThrottle]
     serializer_class = CartSerializer
     permission_classes = [IsAuthenticated]
+    search_fields = ['menuitem__title']
+    ordering_fields = ['menuitem__title', 'quantity']
+    pagination_class = OrderListPagination
 
     def get_queryset(self):
         return Cart.objects.filter(user=self.request.user)
@@ -220,6 +268,15 @@ class CartOperationsView(generics.ListCreateAPIView, generics.RetrieveUpdateDest
             return Response({'message': 'All items removed from cart'}, status=200)
 
 class OrderList(generics.ListCreateAPIView):
+    """
+    List all orders or create a new order.
+    Only authenticated users can create new orders.
+    The list is paginated and can be filtered by user and status.
+    The results can be ordered by user and status.
+    The API is rate-limited to 10 requests per minute for authenticated users
+    and 5 requests per minute for anonymous users.
+
+    """
     throttle_classes = [UserRateThrottle, AnonRateThrottle]
     serializer_class = OrderSerializer
 
@@ -271,6 +328,15 @@ class OrderList(generics.ListCreateAPIView):
         return Response({'message': 'Order created successfully', 'order_id': order.id}, status=201)
     
 class OrderDetail(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Retrieve, update or delete an order.
+    Only authenticated users can retrieve their own orders.
+    Only managers can update or delete orders.
+    The order can be retrieved by its ID.
+    The API is rate-limited to 10 requests per minute for authenticated users
+    and 5 requests per minute for anonymous users.
+
+    """
     throttle_classes = [UserRateThrottle, AnonRateThrottle]
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
