@@ -15,6 +15,7 @@ from decimal import Decimal
 
 class CategorySerializer (serializers.ModelSerializer):
     class Meta:
+        """ This is a serializer for the Category model. It is used to convert complex data types, like querysets and model instances, into native Python datatypes. """
         model = Category
         fields = ['id', 'title', 'slug']
 

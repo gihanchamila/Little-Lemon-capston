@@ -1,6 +1,5 @@
 from django.db import models
 from django.contrib.auth.models import User
-from django.core.exceptions import ValidationError
 
 # Create your models here.
 
@@ -48,4 +47,5 @@ class OrderItem(models.Model):
     price = models.DecimalField(max_digits=6, decimal_places=2, default=0)
 
     class Meta:
+        """ This is a unique constraint on the order and menuitem fields """
         unique_together = ('order', 'menuitem')
