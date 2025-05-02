@@ -217,7 +217,7 @@ class OrderList(generics.ListCreateAPIView):
         order.total = total
         order.save()
 
-        cart_items.delete()
+        cart_items.delete() #
 
         return Response({'message': 'Order created successfully', 'order_id': order.id}, status=201)
     
@@ -235,10 +235,6 @@ class OrderDetail(generics.RetrieveUpdateDestroyAPIView):
     def get_permissions(self):
         if self.request.method == 'GET':
             permission_classes = [IsAuthenticated]
-        elif self.request.method == 'PUT' or self.request.method == 'PATCH':
-            permission_classes = [IsAuthenticated, IsManager, IsDeliveryCrew | IsAdminUser]
-        else:
-            permission_classes = [IsAuthenticated, IsManager | IsAdminUser]
 
         return [permission() for permission in permission_classes]
     
@@ -254,3 +250,13 @@ class OrderDetail(generics.RetrieveUpdateDestroyAPIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data, status=200)
+    
+    def delete(self, request, *args, **kwargs):
+        order = self.get_object()
+        is_manager = request.user.groups.filter(name='Manager').exists()
+
+        if not (is_manager or request.user.is_superuser):
+            return Response({'error': 'You do not have permission to delete this order'}, status=403)
+
+        order.delete()
+        return Response(status=204)
