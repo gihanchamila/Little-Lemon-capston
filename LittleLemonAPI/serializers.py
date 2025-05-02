@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Category, MenuItem, Cart, Order, OrderItem
 from django.contrib.auth.models import User
+from decimal import Decimal
 
 """
     Serializers are used to convert complex data types, like querysets and model instances, into native Python datatypes.
@@ -17,6 +18,11 @@ class CategorySerializer (serializers.ModelSerializer):
         model = Category
         fields = ['id', 'title', 'slug']
 
+        def validate_name(self, value):
+            # Prevent duplicate category names (case-insensitive)
+            if Category.objects.filter(name__iexact=value).exists():
+                raise serializers.ValidationError("A category with this name already exists.")
+            return value
 
 class MenuItemSerializer(serializers.ModelSerializer):
     category = serializers.PrimaryKeyRelatedField(
@@ -34,14 +40,16 @@ class CartSerializer(serializers.ModelSerializer):
         default=serializers.CurrentUserDefault()
     )
 
-
     def validate(self, attrs):
-        attrs['price'] = attrs['quantity'] * attrs['unit_price']
+        # Convert unit_price to Decimal if it's a string
+        unit_price = Decimal(attrs['unit_price'])
+        quantity = attrs['quantity']
+        attrs['price'] = unit_price * quantity
         return attrs
 
     class Meta:
         model = Cart
-        fields = ['user', 'menuitem', 'unit_price', 'quantity', 'price']
+        fields = ['id', 'user', 'menuitem', 'unit_price', 'quantity', 'price']
         extra_kwargs = {
             'price': {'read_only': True}
         }
@@ -63,7 +71,7 @@ class OrderSerializer(serializers.ModelSerializer):
                   'status', 'date', 'total', 'orderitem']
 
 
-class UserSerilializer(serializers.ModelSerializer):
+class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id','username','email']

@@ -9,14 +9,56 @@ from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django.contrib.auth.models import User, Group
 from decimal import Decimal
 
-from .models import MenuItem, Cart, Order, OrderItem
-from .serializers import UserSerializer, MenuItemSerializer, CartSerializer, OrderSerializer, OrderItemSerializer
+from .models import MenuItem, Cart, Order, OrderItem, Category
+from .serializers import CategorySerializer, MenuItemSerializer, CartSerializer, OrderSerializer, OrderItemSerializer, UserSerializer
 from .permissions import IsManager
-from .paginations import MenuItemListPagination, OrderListPagination, CartListPagination
+from .paginations import CategoryListPagination, MenuItemListPagination, OrderListPagination, CartListPagination
 
 # Create your views here.
+class CategoryList(generics.ListCreateAPIView):
+    """
+    List all categories or create a new one.
+    Only managers can create new categories
+    and only authenticated users can view the list.
+    The list is paginated and can be filtered by title.
+    The results can be ordered by title.
+    The API is rate-limited to 10 requests per minute for authenticated users
+    and 5 requests per minute for anonymous users.
 
-class MenuItemsList(generics.ListCreateAPIView):
+    """
+    throttle_classes = [UserRateThrottle, AnonRateThrottle]
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+    search_fields = ['title']
+    ordering_fields = ['title']
+    pagination_class = CategoryListPagination
+
+    def get_permissions(self):
+        permission_classes = []
+        if self.request.method != 'GET':
+            permission_classes = [IsAuthenticated, IsManager]
+        return [permission() for permission in permission_classes]
+
+class singleCategory(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Retrieve, update or delete a category.
+    Only managers can update or delete categories.
+    The category can be retrieved by its ID.
+    The API is rate-limited to 10 requests per minute for authenticated users
+    and 5 requests per minute for anonymous users.
+
+    """
+    throttle_classes = [UserRateThrottle, AnonRateThrottle]
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+
+    def get_permissions(self):
+        permission_classes = []
+        if self.request.method != 'GET':
+            permission_classes = [IsAuthenticated, IsManager]
+        return [permission() for permission in permission_classes]
+    
+class MenuItemList(generics.ListCreateAPIView):
 
     """
     List all menu items or create a new one.
@@ -41,7 +83,7 @@ class MenuItemsList(generics.ListCreateAPIView):
                 permission_classes = [IsAuthenticated,IsManager]
         return[permission() for permission in permission_classes]
     
-class MenuItemDetail(generics.RetrieveUpdateDestroyAPIView):
+class SingleMenuItem(generics.RetrieveUpdateDestroyAPIView):
     """
     Retrieve, update or delete a menu item.
     Only managers can update or delete menu items.
@@ -177,17 +219,16 @@ class DeliveryCrewRemove(generics.DestroyAPIView):
         group = Group.objects.get(name='Delivery Crew')
         user.groups.remove(group)
         return JsonResponse({'message': 'User removed from Delivery crew group'}, status=200)
-    
-class CartOperationsView(generics.ListCreateAPIView, generics.RetrieveUpdateDestroyAPIView):
+
+class CartList(generics.ListCreateAPIView):
     """
     List all items in the cart or add a new item to the cart.
-    Update the quantity of an item in the cart or delete an item from the cart.
     Only authenticated users can access this view.
     The API is rate-limited to 10 requests per minute for authenticated users
     and 5 requests per minute for anonymous users.
-    
+
     """
-    throttle_classes = [AnonRateThrottle, UserRateThrottle]
+    throttle_classes = [UserRateThrottle, AnonRateThrottle]
     serializer_class = CartSerializer
     permission_classes = [IsAuthenticated]
     search_fields = ['menuitem__title']
@@ -196,10 +237,7 @@ class CartOperationsView(generics.ListCreateAPIView, generics.RetrieveUpdateDest
 
     def get_queryset(self):
         return Cart.objects.filter(user=self.request.user)
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-
+    
     def post(self, request, *args, **kwargs):
         menuitem_id = request.data.get('menuitem_id')
         quantity = request.data.get('quantity')
@@ -215,57 +253,35 @@ class CartOperationsView(generics.ListCreateAPIView, generics.RetrieveUpdateDest
         cart_item, created = Cart.objects.get_or_create(
             user=request.user,
             menuitem=menuitem,
-            defaults={'quantity': quantity, 'unit_price': menuitem.price}
+            defaults={'quantity': quantity, 'unit_price': menuitem.price, 'price': menuitem.price * quantity}
+
         )
 
         if not created:
             cart_item.quantity += quantity
+            cart_item.price = cart_item.unit_price * cart_item.quantity
             cart_item.save()
 
         return Response({'message': f"Cart updated successfully, {cart_item.quantity}"}, status=201)
+    
+class SingleCartItem(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Retrieve, update or delete a cart item.
+    Only authenticated users can access this view.
+    The API is rate-limited to 10 requests per minute for authenticated users
+    and 5 requests per minute for anonymous users.
 
+    """
+    throttle_classes = [UserRateThrottle, AnonRateThrottle]
+    serializer_class = CartSerializer
+    permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        return Cart.objects.filter(user=self.request.user)
+    
     def put(self, request, *args, **kwargs):
-        menuitem_id = request.data.get('menuitem_id')
-        quantity = request.data.get('quantity')
-
-        if not menuitem_id or not quantity:
-            return JsonResponse({'error': 'Menu item ID and quantity are required'}, status=400)
-
-        try:
-            menuitem = MenuItem.objects.get(id=menuitem_id)
-        except MenuItem.DoesNotExist:
-            return JsonResponse({'error': 'Menu item does not exist'}, status=404)
-
-        cart_item, created = Cart.objects.get_or_create(
-            user=request.user,
-            menuitem=menuitem,
-            defaults={'quantity': quantity, 'unit_price': menuitem.price}
-        )
-
-        if not created:
-            cart_item.quantity = quantity
-            cart_item.save()
-
-        return Response({'message': f"Cart updated successfully, {quantity}"}, status=200)
-
-    def delete(self, request, *args, **kwargs):
-        menuitem_id = request.data.get('menuitem_id')
-
-        if menuitem_id:
-            # Delete one specific item
-            cart_item = get_object_or_404(
-                Cart,
-                user=request.user,
-                menuitem__id=menuitem_id
-            )
-            cart_item.delete()
-            return Response({'message': 'Item removed from cart'}, status=200)
-        else:
-            # Delete all items
-            Cart.objects.filter(user=request.user).delete()
-            return Response({'message': 'All items removed from cart'}, status=200)
-
+        return super().put(request, *args, **kwargs)
+    
 class OrderList(generics.ListCreateAPIView):
     """
     List all orders or create a new order.
@@ -281,6 +297,10 @@ class OrderList(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     search_fields = ['user__username', 'status']
     ordering_fields = ['user__username', 'status']
+    search_fields = ['user__username', 'status']
+    ordering_fields = ['user__username', 'status']
+    filterset_fields = ['user', 'status']
+    ordering = ['-date']
     pagination_class = OrderListPagination
 
     def get_queryset(self, *args, **kwargs):

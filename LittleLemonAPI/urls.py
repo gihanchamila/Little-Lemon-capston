@@ -3,15 +3,14 @@ from . import views
 
 
 urlpatterns = [
-    path('categories', views.CategoriesView.as_view()),
-    path('menu-items', views.MenuItemsView.as_view()),
-    path('menu-items/<int:pk>', views.SingleMenuItemView.as_view()),
-    path('cart/menu-items', views.CartView.as_view()),
-    path('orders', views.OrderView.as_view()),
-    path('orders/<int:pk>', views.SingleOrderView.as_view()),
-    path('groups/manager/users', views.GroupViewSet.as_view(
-        {'get': 'list', 'post': 'create', 'delete': 'destroy'})),
-
-    path('groups/delivery-crew/users', views.DeliveryCrewViewSet.as_view(
-        {'get': 'list', 'post': 'create', 'delete': 'destroy'}))
+    path('categories/', views.CategoryList.as_view(), name='categories'),
+    path('categories/<int:pk>/', views.singleCategory.as_view(), name='single_category'),
+    path('menu/', views.MenuItemList.as_view(), name='menu'),
+    path('menu/<int:pk>/', views.SingleMenuItem.as_view(), name='single_menu_item'),
+    path('manager/', views.ManagerList.as_view(), name='manager'),
+    path('manager/<int:pk>/', views.ManagerRemove.as_view(), name='single_manager'),
+    path('delivery/', views.DeliveryCrewList.as_view(), name='delivery-crew'),
+    path('delivery/<int:pk>/', views.DeliveryCrewRemove.as_view(), name='single_delivery_crew'),
+    path('cart/', views.CartList.as_view(), name='cart'),
+    path('cart/<int:pk>/', views.SingleCartItem.as_view(), name='single_cart_item'),
 ]
