@@ -22,6 +22,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('LittleLemonAPI.urls')),
+    path('api/', include('Restaurant.urls')),
 
     # User registration and profile
     path('api/users/', include('djoser.urls')),
